@@ -101,6 +101,7 @@ public:
     int GetNumberDataset();
     int GetMatchesInliers();
 public:
+    bool loop_detected;
 
     // Tracking states
     enum eTrackingState{

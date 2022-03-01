@@ -177,6 +177,12 @@ public:
 
     void ChangeDataset();
 
+    // For grid mapping
+    Atlas* getMap() { return mpAtlas; }
+    Tracking* getTracker(){ return mpTracker; }
+    LocalMapping* getLocalMapping(){ return mpLocalMapper; }
+    LoopClosing* getLoopClosing(){ return mpLoopCloser; }
+
     //void SaveAtlas(int type);
 
 private:

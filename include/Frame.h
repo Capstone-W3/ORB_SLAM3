@@ -131,6 +131,9 @@ public:
     cv::Mat mRwc;
     cv::Mat mOw;
 public:
+    // Added for Grid Mapping
+    bool is_keyframe; //modified
+
     // Vocabulary used for relocalization.
     ORBVocabulary* mpORBvocabulary;
 

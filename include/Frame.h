@@ -143,6 +143,9 @@ public:
     // Frame timestamp.
     double mTimeStamp;
 
+    // Frame seq number
+    // int mSeqNum;
+
     // Calibration matrix and OpenCV distortion parameters.
     cv::Mat mK;
     static float fx;

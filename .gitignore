@@ -40,6 +40,10 @@ Thirdparty/g2o/lib/
 Vocabulary/ORBvoc.txt
 build/
 
+devel/
+logs/
+.catkin_tools/
+
 lib/
 
 cmake_modules/

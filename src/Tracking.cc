@@ -45,12 +45,12 @@ namespace ORB_SLAM3
 {
 
 
-Tracking::Tracking(System *pSys, ORBVocabulary* pVoc, FrameDrawer *pFrameDrawer, MapDrawer *pMapDrawer, Atlas *pAtlas, KeyFrameDatabase* pKFDB, const string &strSettingPath, const int sensor, const string &_nameSeq):
+Tracking::Tracking(System *pSys, ORBVocabulary* pVoc, FrameDrawer *pFrameDrawer, MapDrawer *pMapDrawer, Atlas *pAtlas, boost::shared_ptr<PointCloudMapping> pPointCloud, KeyFrameDatabase* pKFDB, const string &strSettingPath, const int sensor, const string &_nameSeq):    
     mState(NO_IMAGES_YET), mSensor(sensor), mTrackedFr(0), mbStep(false),
-    mbOnlyTracking(false), mbMapUpdated(false), mbVO(false), mpORBVocabulary(pVoc), mpKeyFrameDB(pKFDB),
+    mbOnlyTracking(false), mbMapUpdated(false), mbVO(false), mpORBVocabulary(pVoc), mpPointCloudMapping(pPointCloud), mpKeyFrameDB(pKFDB),
     mpInitializer(static_cast<Initializer*>(NULL)), mpSystem(pSys), mpViewer(NULL),
     mpFrameDrawer(pFrameDrawer), mpMapDrawer(pMapDrawer), mpAtlas(pAtlas), mnLastRelocFrameId(0), time_recently_lost(5.0),
-    mnInitialFrameId(0), mbCreatedMap(false), mnFirstFrameId(0), mpCamera2(nullptr), loop_detected(false)
+    mnInitialFrameId(0), mbCreatedMap(false), mnFirstFrameId(0), mpCamera2(nullptr)
 {
     // Load camera parameters from settings file
     cv::FileStorage fSettings(strSettingPath, cv::FileStorage::READ);
@@ -910,9 +910,11 @@ void Tracking::SetStepByStep(bool bSet)
 
 
 
+// cv::Mat Tracking::GrabImageStereo(const cv::Mat &imRectLeft, const cv::Mat &imRectRight, const double &timestamp, const int &seq, string filename)
 cv::Mat Tracking::GrabImageStereo(const cv::Mat &imRectLeft, const cv::Mat &imRectRight, const double &timestamp, string filename)
 {
     mImGray = imRectLeft;
+    mImRGB = imRectLeft;
     cv::Mat imGrayRight = imRectRight;
     mImRight = imRectRight;
 
@@ -955,6 +957,9 @@ cv::Mat Tracking::GrabImageStereo(const cv::Mat &imRectLeft, const cv::Mat &imRe
     std::chrono::steady_clock::time_point t0 = std::chrono::steady_clock::now();
     mCurrentFrame.mNameFile = filename;
     mCurrentFrame.mnDataset = mnNumDataset;
+    // mCurrentFrame.mSeqNum = seq;
+
+    mImDepth = cv::Mat(mCurrentFrame.mvDepth);
 
     Track();
 
@@ -981,11 +986,12 @@ cv::Mat Tracking::GrabImageStereo(const cv::Mat &imRectLeft, const cv::Mat &imRe
     return mCurrentFrame.mTcw.clone();
 }
 
-
+// cv::Mat Tracking::GrabImageRGBD(const cv::Mat &imRGB,const cv::Mat &imD, const double &timestamp, const int &seq, string filename)
 cv::Mat Tracking::GrabImageRGBD(const cv::Mat &imRGB,const cv::Mat &imD, const double &timestamp, string filename)
 {
     mImGray = imRGB;
-    cv::Mat imDepth = imD;
+    mImDepth = imD;
+    mImRGB = imRGB;
 
     if(mImGray.channels()==3)
     {
@@ -1002,15 +1008,15 @@ cv::Mat Tracking::GrabImageRGBD(const cv::Mat &imRGB,const cv::Mat &imD, const d
             cvtColor(mImGray,mImGray,CV_BGRA2GRAY);
     }
 
-    if((fabs(mDepthMapFactor-1.0f)>1e-5) || imDepth.type()!=CV_32F)
-        imDepth.convertTo(imDepth,CV_32F,mDepthMapFactor);
+    if((fabs(mDepthMapFactor-1.0f)>1e-5) || mImDepth.type()!=CV_32F)
+        mImDepth.convertTo(mImDepth,CV_32F,mDepthMapFactor);
 
     std::chrono::steady_clock::time_point t0 = std::chrono::steady_clock::now();
-    mCurrentFrame = Frame(mImGray,imDepth,timestamp,mpORBextractorLeft,mpORBVocabulary,mK,mDistCoef,mbf,mThDepth,mpCamera);
+    mCurrentFrame = Frame(mImGray,mImDepth,timestamp,mpORBextractorLeft,mpORBVocabulary,mK,mDistCoef,mbf,mThDepth,mpCamera);
 
     mCurrentFrame.mNameFile = filename;
     mCurrentFrame.mnDataset = mnNumDataset;
-
+    // mCurrentFrame.mSeqNum = seq;
 
     Track();
 
@@ -1036,10 +1042,11 @@ cv::Mat Tracking::GrabImageRGBD(const cv::Mat &imRGB,const cv::Mat &imD, const d
     return mCurrentFrame.mTcw.clone();
 }
 
-
+// cv::Mat Tracking::GrabImageMonocular(const cv::Mat &im, const double &timestamp, const int &seq, string filename)
 cv::Mat Tracking::GrabImageMonocular(const cv::Mat &im, const double &timestamp, string filename)
 {
     mImGray = im;
+    mImRGB = im;
 
     if(mImGray.channels()==3)
     {
@@ -1080,6 +1087,9 @@ cv::Mat Tracking::GrabImageMonocular(const cv::Mat &im, const double &timestamp,
 
     mCurrentFrame.mNameFile = filename;
     mCurrentFrame.mnDataset = mnNumDataset;
+    // mCurrentFrame.mSeqNum = seq;
+
+    mImDepth = cv::Mat(mCurrentFrame.mvDepth); // Unsure if this will actually do anything for monocular
 
     lastID = mCurrentFrame.mnId;
     Track();
@@ -2908,6 +2918,24 @@ void Tracking::CreateNewKeyFrame()
     mpLocalMapper->InsertKeyFrame(pKF);
 
     mpLocalMapper->SetNotStop(false);
+
+    double minT, maxT;
+    cv::minMaxIdx(mImDepth, &minT, &maxT);
+
+    cout << "Depth mat type " << mImDepth.type() << endl;
+    cout << "DepthMapFactor" << mDepthMapFactor << endl;  
+    cout << "BEFORE +++ (" << minT << ", " << maxT << ") "; 
+
+    cv::minMaxIdx(this->mImRGB, &minT, &maxT);
+
+    cout << "Color mat type " << mImRGB.type() << endl;
+    cout << "Color mat size " << mImRGB.size() << endl;
+    cout << "Color mat channels " << mImRGB.channels() << endl;
+    cout << "Color +++ (" << minT << ", " << maxT << ") "; 
+
+	// insert Key Frame into point cloud viewer
+    mpPointCloudMapping->insertKeyFrame( pKF, this->mImRGB, this->mImDepth, 0 );
+    // mpPointCloudMapping->insertKeyFrame( pKF, this->mImRGB, this->mImDepth, mCurrentFrame.mSeqNum );
 
     mnLastKeyFrameId = mCurrentFrame.mnId;
     mpLastKeyFrame = pKF;

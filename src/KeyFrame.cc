@@ -27,6 +27,8 @@ namespace ORB_SLAM3
 
 long unsigned int KeyFrame::nNextId=0;
 
+        // mnFrameId(0),  mTimeStamp(0), mSeqNum(-1), mnGridCols(FRAME_GRID_COLS), mnGridRows(FRAME_GRID_ROWS),
+
 KeyFrame::KeyFrame():
         mnFrameId(0),  mTimeStamp(0), mnGridCols(FRAME_GRID_COLS), mnGridRows(FRAME_GRID_ROWS),
         mfGridElementWidthInv(0), mfGridElementHeightInv(0),
@@ -44,6 +46,8 @@ KeyFrame::KeyFrame():
 {
 
 }
+
+    // bImu(pMap->isImuInitialized()), mnFrameId(F.mnId),  mTimeStamp(F.mTimeStamp), mSeqNum(F.mSeqNum), mnGridCols(FRAME_GRID_COLS), mnGridRows(FRAME_GRID_ROWS),
 
 KeyFrame::KeyFrame(Frame &F, Map *pMap, KeyFrameDatabase *pKFDB):
     bImu(pMap->isImuInitialized()), mnFrameId(F.mnId),  mTimeStamp(F.mTimeStamp), mnGridCols(FRAME_GRID_COLS), mnGridRows(FRAME_GRID_ROWS),
